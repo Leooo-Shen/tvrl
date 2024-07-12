@@ -1,0 +1,21 @@
+torch
+torchvision
+torchaudio
+xformers --index-url https://download.pytorch.org/whl/cu118
+hydra-core
+matplotlib
+lightly
+numpy
+pandas
+Pillow
+scikit-learn
+scipy
+pytorch-lightning
+tqdm
+wandb
+torchio
+imageio
+lightning-bolts
+git+https://github.com/facebookresearch/fvcore.git
+einops
+timm

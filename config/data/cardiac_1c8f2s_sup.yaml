@@ -1,0 +1,20 @@
+name: cardiac
+img_dir: 
+csv_dir: 
+target: [CAD_broad, Fibrillation, LVEF, CO]
+data_percentage: 1.0
+num_classes: 2
+
+img_size: 128
+channels: 1
+total_frames: 50
+num_slices: 1
+
+n_clips: 1
+clip_frames: 8
+stride: 2
+
+use_time_embed: False
+
+train_batch_size: 256
+test_batch_size: 32

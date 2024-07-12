@@ -1,0 +1,21 @@
+name: cardiac
+img_dir: 
+csv_dir: 
+data_percentage: 1.0
+
+img_size: 128
+channels: 1
+total_frames: 50
+num_slices: 1
+
+train_batch_size: 128
+test_batch_size: 128
+
+n_clips: 2
+clip_frames: 8
+stride: 2
+
+use_time_embed: False
+
+make_clips_identical: True
+sampling_cdf:  

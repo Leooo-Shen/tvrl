@@ -1,0 +1,37 @@
+ckpt_root: checkpoints
+debug: False
+seeds: [1234, 5678]
+num_runs: 2
+
+freeze_backbone: True
+use_time_embed: True
+learnable_time_embed: True
+relative_time_embed: False
+
+pretrained_weights: 
+solver:
+  optimizer: adamw
+  lr: 1e-3
+  weight_decay: 0.05
+  lr_scheduler: warmup_cosine
+  warmup_epochs: 10
+
+  
+trainer:
+  epochs: 100
+  eval_period: 1
+  auto_resume: False  # set to false if restart the training, true when resuming from last checkpoint
+  custom_save_ckpt_path:
+  wandb_version: None # resume the wandb log only if auto_resume is true
+  accumulate_grad_batches: 1
+  precision: 16
+  num_gpus: 1
+
+loader:
+  num_workers: 16
+  pin_memory: True
+  persistent_workers: False
+
+defaults:
+  - data: oct_1c8f_sup
+  - model: vit

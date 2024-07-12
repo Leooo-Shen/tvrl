@@ -1,0 +1,16 @@
+program: sweep.py
+method: grid
+metric:
+  goal: minimize
+  name: test.loss
+  
+parameters:
+  solver.lr:
+    distribution: categorical
+    values: [1e-4, 5e-4, 1e-3, 5e-3]
+
+command:
+  - python3
+  - ${program}
+  - ${args_no_hyphens}
+  # add more args here

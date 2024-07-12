@@ -1,0 +1,50 @@
+ckpt_root: checkpoints
+pretrain_framework: mlm # simclr, mae, mlm, clm, mlm_momentum, clm_momentum
+debug: False
+seed: 2427633826
+
+use_time_embed: False
+learnable_time_embed: True
+relative_time_embed: True
+mlm_w: 0.5
+mask_mode: v2
+
+use_ltn: False # LTN
+temporal_dim: 384
+temporal_depth: 3
+interchangeable: False
+use_token_prediction_head: True
+use_variance_loss: False
+
+mlm:
+  mask_ratio: 0.15
+spatial_pretrained_weights:
+
+
+solver:
+  optimizer: adamw
+  lr: 2e-4
+  weight_decay: 0.05
+  lr_scheduler: warmup_cosine
+  warmup_epochs: 20
+
+trainer:
+  epochs: 200
+  auto_resume: False  # set to false if restart the training, true when resuming from last checkpoint
+  custom_save_ckpt_path: 
+  wandb_version: None # resume the wandb log only if auto_resume is true
+  accumulate_grad_batches: 1
+  precision: 16
+  num_gpus: 1
+
+loader:
+  num_workers: 32
+  pin_memory: True
+  persistent_workers: False
+  
+simclr:
+  temperature: 0.1
+
+defaults:
+  - data: oct_1c8f_ssl
+  - model: vit

@@ -1,0 +1,22 @@
+name: oct
+img_dir:
+csv_dir: 
+data_percentage: 1.0
+
+img_size: 128
+channels: 1
+num_slices: 1
+
+n_clips: 1
+clip_frames: 8
+stride: 1
+min_frames: 1
+
+use_time_embed: False
+
+train_batch_size: 256
+test_batch_size: 64
+
+target: ["Late", "Converts_to_cRORA of 1000 um_within_3_years", "Converts_to_CNV_within_3_years", "Converts_to_Scar_within_3_years"]
+num_classes: 2
+balance_classes: False
