@@ -1,10 +1,7 @@
 # Spatiotemporal Representation Learning for Short and Long Medical Image Time Series (MICCAI 2024)
-Implmentation of "[Spatiotemporal Representation Learning for Short and Long Medical Image Time Series](https://arxiv.org/abs/2403.07513)" accepted at MICCAI 2024.
+Implmentation of "[Spatiotemporal Representation Learning for Short and Long Medical Image Time Series](https://arxiv.org/abs/2403.07513)" accepted at MICCAI 2024. Please do not hesitate to contact us if you have any questions.
 
 ![image](assets/figure1.png)
-
-Clinicians use spatiotemporal data to observe temporal variations over both ***short*** and ***long*** time scales. To observe dynamic physiological processes such as a beating heart, short cardiac MR videos can be captured (top). Tracking long term developments, such as disease progression in retinal OCT scans, require longitudinal acquisitions that typically occur at irregular intervals of years (bottom). Modeling and extrapolating the trajectory of historical change is crucial for the prognosis of late stage disease.
-
 
 
 ## Contributions
@@ -70,3 +67,16 @@ python pretrain.py --config-name=pretrain pretrain_framework=simclr data=cardiac
 
 ### Hyperparameter Tunning with Wandb Sweep
 Wandb sweep can be used to run multiple experiments with different hyperparameters. Please check the [official documentation](https://docs.wandb.ai/guides/sweeps) for more details. We also provide a sample sweep configuration file `sweep/sweep.yaml`.
+
+
+## Citing our work
+If our work has contributed to your research, we would greatly appreciate an acknowledgement by citing us as follows:
+```
+@article{shen2024spatiotemporal,
+  title={Spatiotemporal Representation Learning for Short and Long Medical Image Time Series},
+  author={Shen, Chengzhi and Menten, Martin J and Bogunovi{\'c}, Hrvoje and Schmidt-Erfurth, Ursula and Scholl, Hendrik and Sivaprasad, Sobha and Lotery, Andrew and Rueckert, Daniel and Hager, Paul and Holland, Robbie},
+  journal={arXiv preprint arXiv:2403.07513},
+  year={2024}
+}
+
+```
