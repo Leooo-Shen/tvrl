@@ -1,14 +1,14 @@
-import os
 import ast
-import torch
+import os
+
 import pandas as pd
 import pytorch_lightning as pl
-from torchvision.transforms import v2
-
-from transforms import oct_aug_mild, oct_aug_strong, oct_aug_mae
-from torch.utils.data import DataLoader
-from oct_datasets import OCTDataset, OCTContrastiveDataset
+import torch
+from oct_datasets import OCTContrastiveDataset, OCTDataset
 from tasks import oct_task_list
+from torch.utils.data import DataLoader
+from torchvision.transforms import v2
+from transforms import oct_aug_mae, oct_aug_mild, oct_aug_strong
 
 
 class OCTDataModule(pl.LightningDataModule):
@@ -74,10 +74,6 @@ class OCTDataModule(pl.LightningDataModule):
             "simclr",
             "mlm",
             "clm",
-            "mlm_momentum",
-            "clm_momentum",
-            "simclr_mae",
-            "simsiam_mlm",
         ]:
             self.setup_contrastive(stage)
         elif self.pretrain_framework == "mae":

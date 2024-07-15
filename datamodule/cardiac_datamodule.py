@@ -1,16 +1,13 @@
 import os
-import torch
+
 import pandas as pd
 import pytorch_lightning as pl
-from torchvision.transforms import v2
-
-from transforms import cardiac_aug_mild, cardiac_aug_strong, cardiac_aug_mae
-from torch.utils.data import DataLoader
-from cardiac_datasets import (
-    CardiacDataset,
-    CardiacContrastiveDataset,
-)
+import torch
+from cardiac_datasets import CardiacContrastiveDataset, CardiacDataset
 from tasks import cardiac_task_is_regression
+from torch.utils.data import DataLoader
+from torchvision.transforms import v2
+from transforms import cardiac_aug_mae, cardiac_aug_mild, cardiac_aug_strong
 
 
 class CardiacDataModule(pl.LightningDataModule):
@@ -54,7 +51,7 @@ class CardiacDataModule(pl.LightningDataModule):
         print("[*] Setting up DataModule ...")
         if self.pretrain_framework in ["simclr"]:
             self.setup_contrastive(stage, strict_half=False)
-        elif self.pretrain_framework in ["mlm", "clm", "mlm_momentum", "clm_momentum", "simclr_mae", "simsiam_mlm"]:
+        elif self.pretrain_framework in ["mlm", "clm"]:
             self.setup_contrastive(stage, strict_half=True)
         elif self.pretrain_framework == "mae":
             self.setup_mae(stage)

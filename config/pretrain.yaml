@@ -1,5 +1,5 @@
 ckpt_root: checkpoints
-pretrain_framework: mlm # simclr, mae, mlm, clm, mlm_momentum, clm_momentum
+pretrain_framework: mlm # simclr, mae, mlm, clm
 debug: False
 seed: 2427633826
 

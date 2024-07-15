@@ -1,26 +1,19 @@
 import os
 import random
-import torch
-import pytorch_lightning as pl
+import warnings
 
+import hydra
+import pytorch_lightning as pl
+import torch
+from omegaconf import DictConfig
+from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import (
-    ModelCheckpoint,
-    LearningRateMonitor,
-    EarlyStopping,
-)
 
 from datamodule.cardiac_datamodule import CardiacDataModule
 from datamodule.oct_datamodule import OCTDataModule
-
-from models.simclr import SimCLR
 from models.mae import VideoMAE
-from models.simclr import SimCLRMaskLM, SimCLRCausalLM, SimCLRMAE
+from models.simclr import SimCLR, SimCLRCausalLM, SimCLRMaskLM
 from models.spatiotemporal import SpatioTemporalEncoder
-
-import hydra
-from omegaconf import DictConfig
-import warnings
 
 warnings.filterwarnings("ignore")
 torch.set_float32_matmul_precision("medium")
@@ -144,8 +137,6 @@ def build_model(cfg):
         model = SimCLRMaskLM(encoder, cfg)
     elif cfg.pretrain_framework == "clm":
         model = SimCLRCausalLM(encoder, cfg)
-    elif cfg.pretrain_framework == "simclr_mae":
-        model = SimCLRMAE(encoder, cfg)
     else:
         raise NotImplementedError
     return model

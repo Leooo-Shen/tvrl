@@ -1,14 +1,15 @@
 import subprocess
-import torch
-from torch import nn
-import torch.nn.functional as F
-import pytorch_lightning as pl
 
+import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
+from lightly.loss import NegativeCosineSimilarity, NTXentLoss
 from lightly.models.modules import SimCLRProjectionHead
+from torch import nn
+
 from models.scheduler import build_scheduler
+from models.utils import InfoNCELoss, token_mapping
 from models.videovit import TimeEmbedding
-from lightly.loss import NTXentLoss, NegativeCosineSimilarity
-from models.utils import token_mapping, InfoNCELoss
 from models.vit_helper import ViT_Backbone
 
 
@@ -18,6 +19,11 @@ def ortho_penalty(t):
 
 
 class SimCLR(pl.LightningModule):
+    """A standard SimCLR model with InfoNCE loss.
+
+    Additionally, it supports Latent Time Navigation (https://arxiv.org/abs/2305.06437) for temporal encoder.
+    """
+
     def __init__(self, encoder, cfg):
         super(SimCLR, self).__init__()
         self.save_hyperparameters()
@@ -36,13 +42,13 @@ class SimCLR(pl.LightningModule):
 
         self.use_ltn = cfg.get("use_ltn", False)
         if self.use_ltn:
-            # v1: random init, run QR decomposition at each forward pass
+            # v1: random init, run QR decomposition at each forward pass, as implemented in the paper
             self.Dt = nn.Parameter(torch.randn(64, in_dim))
 
-            # v2: init with orthogonal matrix, use orthogonal loss
+            # v2: init with orthogonal matrix, use orthogonal loss.
             # self.Dt = nn.Parameter(torch.nn.init.orthogonal_(torch.empty(64, in_dim)))
             # self.ortho_loss = ortho_penalty
-            
+
             self.ltn_embed = nn.Sequential(nn.Linear(in_dim * 2, 2048), nn.ReLU(), nn.Linear(2048, 64))
             self.time_embed = TimeEmbedding(in_dim, learnable=True)
 
@@ -133,9 +139,13 @@ class SimCLR(pl.LightningModule):
             )
 
 
-
 class SimCLRMaskLM(pl.LightningModule):
-    """SimCLR with MLM (masked language modeling) training for temporal encoder"""
+    """SimCLR with MIM (masked image modeling) training for temporal encoder.
+
+    Given a sequence of frame-level tokens output by our spatial encoder, we
+    randomly mask out a subset of tokens and let the temporal encoder to
+    reconstruct them in the feature space. See Section 3.5 for more details.
+    """
 
     def __init__(self, encoder, cfg):
         super(SimCLRMaskLM, self).__init__()
@@ -168,13 +178,6 @@ class SimCLRMaskLM(pl.LightningModule):
             input_dim=self.temporal_dim, batch_norm=False, output_dim=self.temporal_dim
         )
         self.criterion_mlm = NegativeCosineSimilarity()
-
-    # def orthogonality_loss(self, x, mask):
-    #     cos_sim = F.cosine_similarity(x.unsqueeze(2), x.unsqueeze(1), dim=3)
-    #     average_similarity = cos_sim[
-    #         ((mask.unsqueeze(2) * mask.unsqueeze(1)) * torch.triu(torch.ones_like(cos_sim), diagonal=1)).bool()
-    #     ].mean()
-    #     return average_similarity
 
     def log_sample_similarities(self, x, attn_mask, stage):
         inter_sim = self.criterion_mlm(x[1:, 0:1], x[:-1, 0:1])
@@ -342,132 +345,8 @@ class SimCLRMaskLM(pl.LightningModule):
         return [optimizer], [lr_scheduler]
 
 
-class SimCLRMAE(pl.LightningModule):
-    """SimCLR with MLM (masked language modeling) training for temporal encoder"""
-
-    def __init__(self, encoder, cfg):
-        super(SimCLRMAE, self).__init__()
-        self.save_hyperparameters()
-        self.cfg = cfg
-        self.lr = float(cfg.solver.lr) * float(cfg.data.train_batch_size) / 256
-        self.epochs = cfg.trainer.epochs
-        self.weight_decay = float(cfg.solver.weight_decay)
-        self.optimizer_type = cfg.solver.optimizer
-        self.lr_scheduler_type = cfg.solver.lr_scheduler
-        self.warmup_epochs = cfg.solver.warmup_epochs
-
-        # setup contrastive
-        self.encoder = encoder
-        self.temporal_dim = encoder.temporal_dim
-        self.simclr_head = SimCLRProjectionHead(input_dim=self.temporal_dim)
-        self.criterion_contrastive = NTXentLoss(temperature=cfg.simclr.temperature)
-
-        # setup MLM
-        self.mask_ratio = cfg.mlm.get("mask_ratio", 0.15)
-        print(f"[*] Using mask ratio: {self.mask_ratio}")
-
-        self.mask_token = nn.Parameter(torch.zeros(1, 1, self.temporal_dim))
-        self.criterion_mlm = nn.MSELoss()
-
-        self.decoder_pos_embed = nn.Parameter(torch.zeros(1, 8, self.temporal_dim))
-        self.decoder = ViT_Backbone(embed_dim=self.temporal_dim, depth=3, num_heads=6, mlp_ratio=4)
-        self.decoder_norm = nn.LayerNorm(self.temporal_dim)
-        self.decoder_head = nn.Linear(self.temporal_dim, self.temporal_dim)
-
-    def generate_token_mask(self, attn_mask, mask_ratio, mask_value=token_mapping["mask"]):
-        """Generate token masks only at the location where the attn_mask is 1."""
-        attn_mask = attn_mask.int()
-        ones_positions = attn_mask == 1
-        random_masks = torch.rand(attn_mask.shape, device=attn_mask.device)
-        random_masks = ones_positions * (random_masks < mask_ratio)
-        token_mask = attn_mask + ones_positions * random_masks * (mask_value - attn_mask)
-        return token_mask
-
-    def mlm_reconstruct(self, x, tm, attn_mask=None):
-        x_masked = x.clone()
-        x_masked[tm == token_mapping["mask"]] = self.mask_token
-        x_masked += self.decoder_pos_embed
-
-        # reconstruct the sequence
-        x = self.decoder_norm(self.decoder(x_masked, attn_mask))
-        x = self.decoder_head(x)
-        return x
-
-    def _shared_step(self, batch, stage=None):
-        """
-        x -> [spatial encoder] -> x_spatial -> (mask) x_vis -> [temporal encoder] -> CLS contrastive loss
-                                                                                -> latent  -> [temporal decoder] -> (x_recon, x_spatial) MLM loss
-
-        """
-        # w = cosine_schedule(self.current_epoch, self.epochs, 0, 0.9)
-        w = 0.5 if self.current_epoch > 100 else 0.0
-        # w = 0.5
-
-        clips, attn_masks, time_steps = batch
-        x0, x1 = clips
-        m0, m1 = attn_masks
-        t0, t1 = time_steps
-
-        # x_spatial is after mid_project, used for mlm loss
-        x0_spatial = self.encoder.forward_spatio_encoder(x0)
-        x1_spatial = self.encoder.forward_spatio_encoder(x1)
-
-        # plus pos/time embed
-        x0 = self.encoder.prepare_temporal_token(x0_spatial, t0)
-        x1 = self.encoder.prepare_temporal_token(x1_spatial, t1)
-
-        # mask tokens by modifying the attention mask
-        tm0 = self.generate_token_mask(m0, self.mask_ratio)
-        tm1 = self.generate_token_mask(m1, self.mask_ratio)
-        tm0_ = tm0.clone()
-        tm1_ = tm1.clone()
-        tm0_[tm0_ == token_mapping["mask"]] = 0
-        tm1_[tm1_ == token_mapping["mask"]] = 0
-
-        # contrastive loss on CLS token
-        latent0 = self.encoder.forward_temporal_encoder(x0, attn_mask=tm0_, prepare_token=False)
-        latent1 = self.encoder.forward_temporal_encoder(x1, attn_mask=tm1_, prepare_token=False)
-        z0 = self.simclr_head(latent0[:, 0, :])
-        z1 = self.simclr_head(latent1[:, 0, :])
-        loss_contrastive = self.criterion_contrastive(z0, z1)
-
-        if w > 0:
-            # MLM loss
-            x0_recon = self.mlm_reconstruct(latent0[:, 1:, :], tm0, m0)
-            x1_recon = self.mlm_reconstruct(latent1[:, 1:, :], tm1, m1)
-
-            l_00 = self.criterion_mlm(x0_recon[tm0 == token_mapping["mask"]], x0_spatial[tm0 == token_mapping["mask"]])
-            l_11 = self.criterion_mlm(x1_recon[tm1 == token_mapping["mask"]], x1_spatial[tm1 == token_mapping["mask"]])
-            loss_mlm = (l_00 + l_11) * 0.5
-
-            # total loss
-            loss = (1 - w) * loss_contrastive + w * loss_mlm
-        else:
-            loss_mlm = None
-            loss = loss_contrastive
-
-        self.log(stage + ".loss", loss, on_step=False, on_epoch=True, logger=True)
-        self.log(stage + ".contrastive_loss", loss_contrastive, on_step=False, on_epoch=True, logger=True)
-        if loss_mlm is not None:
-            self.log(stage + ".mlm_loss", loss_mlm, on_step=False, on_epoch=True, logger=True)
-        return loss
-
-    def training_step(self, batch, batch_idx):
-        return self._shared_step(batch, stage="train")
-
-    def validation_step(self, batch, batch_idx):
-        self._shared_step(batch, stage="val")
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        lr_scheduler = build_scheduler(
-            optimizer, self.lr_scheduler_type, max_epochs=self.epochs, warmup_epochs=self.warmup_epochs
-        )
-        return [optimizer], [lr_scheduler]
-
-
 class SimCLRCausalLM(pl.LightningModule):
-    """SimCLR with autoregressive training for temporal encoder"""
+    """SimCLR with autoregressive training for temporal encoder. Not used in current paper."""
 
     def __init__(self, encoder, cfg):
         super(SimCLRCausalLM, self).__init__()

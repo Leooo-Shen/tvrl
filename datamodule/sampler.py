@@ -1,6 +1,7 @@
 import random
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class PowerFunction:
@@ -236,56 +237,6 @@ class ClipSamplingDense:
             clips.append(c)
 
         return clips, clip_indices
-
-
-# class PathSamplingWithCDF:
-#     """
-#     Sample 2 clips from a video, following a given CDF.
-#     The sampling is bi-directional: clip2 can be either left or right to clip1.
-#     Total temporal length = clip_frames * stride
-
-#     """
-
-#     def __init__(self, clip_frames, cdf_type, stride):
-#         self.clip_frames = clip_frames
-#         self.cdf = CDF(cdf_type)
-#         self.stride = stride
-
-#         print(f"[*] Sampling 2 clips with {clip_frames} frames {stride} strides and {cdf_type} function")
-
-#     def __call__(self, paths):
-#         total_frames = len(paths)
-#         if total_frames < self.clip_frames:
-#             return [paths] * self.n_clips, [np.arange(total_frames)] * self.n_clips
-
-#         start_range = total_frames - self.clip_frames * self.stride
-#         first_clip_start = random.randint(0, start_range)
-#         first_clip_idx = torch.arange(
-#             first_clip_start,
-#             first_clip_start + self.clip_frames * self.stride,
-#             self.stride,
-#         )
-
-#         direction = np.random.choice([-1, 1])
-#         if direction == 1:
-#             # sample from the right
-#             interval_range = np.arange(total_frames - max(first_clip_idx) + 1)
-#         else:
-#             # sample from the left
-#             interval_range = np.arange(first_clip_start + 1)
-#         p = CDF("linear_decrease")(interval_range)
-#         interval = np.random.choice(len(interval_range), p=p)
-#         second_clip_start = first_clip_start + direction * interval
-#         second_clip_idx = torch.arange(
-#             second_clip_start,
-#             second_clip_start + self.clip_frames * self.stride,
-#             self.stride,
-#         )
-
-#         first_clip_path = [paths[i] for i in first_clip_idx]
-#         second_clip_path = [paths[i] for i in second_clip_idx]
-
-#         return [first_clip_path, second_clip_path], [first_clip_idx, second_clip_idx]
 
 
 class PathSamplingRandom:
